@@ -11,6 +11,12 @@ type messageQueue struct {
 	queue *list.List
 }
 
+func newMessageQueue() *messageQueue {
+	return &messageQueue{
+		queue: list.New(),
+	}
+}
+
 func (m *messageQueue) Push(str string) {
 	m.queue.PushBack(str)
 }
