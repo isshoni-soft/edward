@@ -40,6 +40,7 @@ func (p *PacketChannel) Start() {
 
 func (p *PacketChannel) Close() {
 	p.shutdown <- true
+	p.running = false
 }
 
 func (p *PacketChannel) outboundFunc() {
@@ -75,10 +76,11 @@ func (p *PacketChannel) inboundFunc() {
 
 		var message string
 
-		if m, err := reader.ReadString('\n'); err != nil {
+		if m, err := reader.ReadString('\n'); err == nil {
 			message = m
 		} else {
 			fmt.Println("[error]: reader thread errored!")
+			fmt.Println(err)
 			continue
 		}
 
@@ -86,7 +88,7 @@ func (p *PacketChannel) inboundFunc() {
 		// TODO: Un-encrypt blob
 		// TODO: Create packet object then fire on packet listeners
 
-		fmt.Println(message)
+		fmt.Print(message)
 	}
 }
 
