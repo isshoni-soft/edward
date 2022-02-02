@@ -20,7 +20,6 @@ type PacketChannel struct {
 	running    bool
 	shutdown   chan bool
 	outbound   *messageQueue
-	inbound    *messageQueue
 }
 
 func NewPacketChannel(connection net.Conn) *PacketChannel {
@@ -29,17 +28,14 @@ func NewPacketChannel(connection net.Conn) *PacketChannel {
 		running:    false,
 		shutdown:   make(chan bool),
 		outbound:   newMessageQueue(),
-		inbound:    newMessageQueue(),
 	}
 }
 
-func (p *PacketChannel) Start() chan bool {
+func (p *PacketChannel) Start() {
 	p.run(p.inboundFunc)
 	p.run(p.outboundFunc)
 
 	p.running = true
-
-	return p.shutdown
 }
 
 func (p *PacketChannel) Close() {
@@ -60,7 +56,8 @@ func (p *PacketChannel) outboundFunc() {
 
 		message, _ := p.outbound.Pop()
 
-		// TODO: Do a little bit of encoding
+		// TODO: Do a little bit of encryption
+		// TODO: Base64 encode the encrypted blob
 
 		fmt.Fprintln(p.connection, message)
 	}
@@ -85,7 +82,11 @@ func (p *PacketChannel) inboundFunc() {
 			continue
 		}
 
-		p.inbound.Push(message)
+		// TODO: Decode Base64 to encrypted blob
+		// TODO: Un-encrypt blob
+		// TODO: Create packet object then fire on packet listeners
+
+		fmt.Println(message)
 	}
 }
 
