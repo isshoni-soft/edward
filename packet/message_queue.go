@@ -1,4 +1,4 @@
-package network
+package packet
 
 import (
 	"container/list"

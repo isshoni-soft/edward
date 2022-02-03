@@ -3,6 +3,7 @@ package network
 import (
 	"container/list"
 	"fmt"
+	"github.com/isshoni-soft/edward/packet"
 	"net"
 )
 
@@ -15,6 +16,7 @@ import (
 type Listener struct {
 	Address string
 	Port    string
+	Encoder packet.Encoder
 
 	running     bool
 	connections *list.List
@@ -29,6 +31,10 @@ func (l *Listener) Start() {
 
 	if l.connections == nil {
 		l.connections = list.New()
+	}
+
+	if l.Encoder == nil {
+		l.Encoder = packet.SimpleEncoder{}
 	}
 
 	if li, err := net.Listen("tcp", l.Address+":"+l.Port); err == nil {
@@ -50,7 +56,7 @@ func (l *Listener) Start() {
 			conn, _ := l.listener.Accept()
 			fmt.Println("Accepted new connection")
 
-			channel := NewPacketChannel(conn)
+			channel := packet.NewChannel(conn, l.Encoder)
 			channel.Start()
 
 			l.connections.PushBack(channel)
