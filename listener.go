@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/isshoni-soft/edward/packet"
+	"github.com/isshoni-soft/edward/protocol"
 	"net"
 )
 
@@ -14,9 +15,10 @@ import (
 // TODO: keep a reference to that packet channel for communication
 
 type Listener struct {
-	Address string
-	Port    string
-	Encoder packet.Encoder
+	Address  string
+	Port     string
+	Encoder  packet.Encoder
+	Protocol protocol.Manager
 
 	running     bool
 	connections *list.List
@@ -29,13 +31,19 @@ func (l *Listener) Start() {
 		return
 	}
 
+	if l.Protocol == nil {
+		panic(fmt.Errorf("network listener requires a protocol"))
+	}
+
 	if l.connections == nil {
 		l.connections = list.New()
 	}
 
 	if l.Encoder == nil {
-		l.Encoder = packet.SimpleEncoder{}
+		l.Encoder = packet.NewSimpleEncoder()
 	}
+
+	l.Protocol.RegisterPackets(l.Encoder.PacketRegistry())
 
 	if li, err := net.Listen("tcp", l.Address+":"+l.Port); err == nil {
 		l.listener = li

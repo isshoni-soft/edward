@@ -3,16 +3,13 @@ package packet
 import (
 	"encoding/base64"
 	"encoding/json"
-	"github.com/isshoni-soft/edward/protocol"
 	"reflect"
 )
 
 type Encoder interface {
 	EncodePacket(data interface{}) (string, error)
 	DecodePacket(str string) (*DecodedPacket, error)
-	RegisterPacket(name string, sample interface{})
-	GetPacket(name string) reflect.Type
-	IsPacket(data interface{}) bool
+	PacketRegistry() Registry
 }
 
 type packet struct {
@@ -27,29 +24,32 @@ type DecodedPacket struct {
 }
 
 type SimpleEncoder struct {
-	registry        map[string]reflect.Type
-	reverseRegistry map[reflect.Type]string
+	registry Registry
 }
 
 func NewSimpleEncoder() *SimpleEncoder {
 	result := &SimpleEncoder{
-		registry:        make(map[string]reflect.Type),
-		reverseRegistry: make(map[reflect.Type]string),
+		registry: &SimpleRegistry{},
 	}
-	result.RegisterPacket("handshake", protocol.HandshakePacket{})
 
 	return result
 }
 
+func NewSimpleEncoderWithRegistry(registry Registry) *SimpleEncoder {
+	return &SimpleEncoder{
+		registry: registry,
+	}
+}
+
 func (s *SimpleEncoder) EncodePacket(data interface{}) (string, error) {
-	if !s.IsPacket(data) {
+	if !s.registry.IsPacket(data) {
 		return "", UnrecognizedPacket{
 			Type: reflect.TypeOf(data).String(),
 		}
 	}
 
 	packet := packet{
-		Name: s.reverseRegistry[reflect.TypeOf(data)],
+		Name: s.registry.GetPacketNameByType(reflect.TypeOf(data)),
 	}
 
 	if d, err := json.Marshal(packet); err == nil {
@@ -83,12 +83,12 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 
 	var packetType reflect.Type
 
-	if t, ok := s.registry[packet.Name]; !ok {
+	if !s.registry.IsPacketName(packet.Name) {
 		return nil, UnrecognizedPacket{
 			Type: packet.Name,
 		}
 	} else {
-		packetType = t
+		packetType = s.registry.GetPacketTypeByName(packet.Name)
 	}
 
 	// this might be overkill, but I don't trust the json library
@@ -108,15 +108,6 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	}, nil
 }
 
-func (s *SimpleEncoder) RegisterPacket(name string, sample interface{}) {
-	s.registry[name] = reflect.TypeOf(sample)
-}
-
-func (s *SimpleEncoder) GetPacket(name string) reflect.Type {
-	return s.registry[name]
-}
-
-func (s *SimpleEncoder) IsPacket(data interface{}) (ok bool) {
-	_, ok = s.reverseRegistry[reflect.TypeOf(data)]
-	return
+func (s *SimpleEncoder) PacketRegistry() Registry {
+	return s.registry
 }
