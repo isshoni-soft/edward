@@ -15,10 +15,11 @@ import (
 // TODO: keep a reference to that packet channel for communication
 
 type Listener struct {
-	Address  string
-	Port     string
-	Encoder  packet.Encoder
-	Protocol protocol.Manager
+	Address        string
+	Port           string
+	Encoder        packet.Encoder
+	Protocol       protocol.Manager
+	ChannelPreInit func(channel packet.Channel, protocol protocol.Manager)
 
 	running     bool
 	connections *list.List
@@ -64,10 +65,30 @@ func (l *Listener) Start() {
 			conn, _ := l.listener.Accept()
 			fmt.Println("Accepted new connection")
 
+			fmt.Println("Creating channel...")
 			channel := packet.NewChannel(conn, l.Encoder)
+			fmt.Println("Applying protocol...")
+			l.Protocol.RegisterListeners(channel)
+			l.ChannelPreInit(channel, l.Protocol)
+			fmt.Println("Starting channel...")
 			channel.Start()
 
 			l.connections.PushBack(channel)
+			fmt.Println("Channel initialized!")
 		}
 	}()
+}
+
+func (l *Listener) OnAllConnections(f func(channel packet.Channel)) {
+	connections := l.Connections()
+
+	for e := connections.Front(); e != nil; e = e.Next() {
+		channel := e.Value.(packet.Channel)
+
+		f(channel)
+	}
+}
+
+func (l Listener) Connections() list.List {
+	return *l.connections
 }

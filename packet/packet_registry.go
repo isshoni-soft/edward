@@ -15,8 +15,16 @@ type SimpleRegistry struct {
 	reverseRegistry map[reflect.Type]string
 }
 
+func NewSimpleRegistry() *SimpleRegistry {
+	return &SimpleRegistry{
+		registry:        make(map[string]reflect.Type),
+		reverseRegistry: make(map[reflect.Type]string),
+	}
+}
+
 func (s *SimpleRegistry) RegisterPacket(name string, sample interface{}) {
 	s.registry[name] = reflect.TypeOf(sample)
+	s.reverseRegistry[reflect.TypeOf(sample)] = name
 }
 
 func (s *SimpleRegistry) GetPacketTypeByName(name string) reflect.Type {

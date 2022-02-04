@@ -3,6 +3,7 @@ package packet
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"reflect"
 )
 
@@ -14,7 +15,7 @@ type Encoder interface {
 
 type packet struct {
 	Name string      `json:"name"`
-	Data interface{} `json:"data"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 type DecodedPacket struct {
@@ -29,7 +30,7 @@ type SimpleEncoder struct {
 
 func NewSimpleEncoder() *SimpleEncoder {
 	result := &SimpleEncoder{
-		registry: &SimpleRegistry{},
+		registry: NewSimpleRegistry(),
 	}
 
 	return result
@@ -50,9 +51,11 @@ func (s *SimpleEncoder) EncodePacket(data interface{}) (string, error) {
 
 	packet := packet{
 		Name: s.registry.GetPacketNameByType(reflect.TypeOf(data)),
+		Data: data,
 	}
 
 	if d, err := json.Marshal(packet); err == nil {
+		fmt.Println("Final packet: " + string(d))
 
 		// TODO: Encrypt here
 
@@ -64,20 +67,27 @@ func (s *SimpleEncoder) EncodePacket(data interface{}) (string, error) {
 
 func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	var decodedStr string
+	var raw []byte
+
+	fmt.Println("Decoding packet: " + str)
 
 	if d, err := base64.StdEncoding.DecodeString(str); err == nil {
 		decodedStr = string(d)
+		raw = d
 	} else {
 		return nil, MalformedProtocol{
 			Reason: "failed to decode base64",
 		}
 	}
 
+	fmt.Println("Decoded from base64: " + decodedStr)
+
 	// TODO: Decrypt here
 
 	var packet *packet
 
-	if err := json.Unmarshal([]byte(decodedStr), packet); err != nil {
+	fmt.Println("Unmarshalling packet...")
+	if err := json.Unmarshal(raw, &packet); err != nil {
 		return nil, err
 	}
 
@@ -92,20 +102,42 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	}
 
 	// this might be overkill, but I don't trust the json library
+	// want to make sure we can safely cast the received interface to the packet's type
+	packetValue := reflect.New(packetType).Interface()
+
 	remarshaled, _ := json.Marshal(packet.Data)
 
-	// want to make sure we can safely cast the received interface to the packet's type
-	packetValue := reflect.New(packetType).Elem().Interface()
+	fmt.Println("RE: " + string(remarshaled))
 
 	if err := json.Unmarshal(remarshaled, &packetValue); err != nil {
-		return nil, err
+		fmt.Println("ERROR: ", err)
 	}
 
-	return &DecodedPacket{
+	result := &DecodedPacket{
 		Name: packet.Name,
 		Type: packetType,
 		Data: packetValue,
-	}, nil
+	}
+
+	return result, nil
+
+	// fmt.Println("Packet Data:", packet.Data)
+	//
+	// if packet.Data == nil {
+	// 	return result, nil
+	// }
+	//
+	// remarshaled, err := json.Marshal(packet.Data)
+	//
+	// if err != nil {
+	// 	fmt.Println("json encounterd error", err)
+	// }
+	//
+	// if err := json.Unmarshal(remarshaled, &packetValue); err != nil {
+	// 	return nil, err
+	// }
+	//
+	// return result, nil
 }
 
 func (s *SimpleEncoder) PacketRegistry() Registry {
