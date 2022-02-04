@@ -15,3 +15,9 @@ type MalformedProtocol struct {
 func (m MalformedProtocol) Error() string {
 	return "malformed protocol: " + m.Reason
 }
+
+type ClosedChannel struct{}
+
+func (c ClosedChannel) Error() string {
+	return "this channel is not running"
+}

@@ -22,21 +22,27 @@ type Listener func(channel Channel, packet interface{})
 type Channel interface {
 	Start()
 	Close()
+	SetCloseCallback(callback func(c Channel))
 	RegisterPacketListener(sample interface{}, listener Listener)
 	SendPacket(packet interface{}) error
 	SendRawMessage(str string)
 	UUID() uuid.UUID
+	Running() bool
 }
 
 type SimpleChannel struct {
 	Encoder Encoder
 	Uuid    uuid.UUID
+	OnClose func(c Channel)
 
 	connection  net.Conn
 	running     bool
 	shutdownOut chan bool
+	outShutdown chan bool
 	shutdownIn  chan bool
+	inShutdown  chan bool
 	outbound    chan string
+	inbound     chan string
 	listeners   map[reflect.Type][]Listener
 }
 
@@ -44,16 +50,21 @@ func NewChannel(connection net.Conn, encoder Encoder) Channel {
 	return &SimpleChannel{
 		Encoder:     encoder,
 		Uuid:        uuid.New(),
+		OnClose:     func(c Channel) {},
 		connection:  connection,
 		running:     false,
 		shutdownOut: make(chan bool),
+		outShutdown: make(chan bool),
 		shutdownIn:  make(chan bool),
+		inShutdown:  make(chan bool),
 		outbound:    make(chan string, 10),
+		inbound:     make(chan string, 10),
 		listeners:   make(map[reflect.Type][]Listener),
 	}
 }
 
 func (c *SimpleChannel) Start() {
+	c.run(c.readerFunc)
 	c.run(c.inboundFunc)
 	c.run(c.outboundFunc)
 
@@ -61,9 +72,22 @@ func (c *SimpleChannel) Start() {
 }
 
 func (c *SimpleChannel) Close() {
-	c.shutdownOut <- true
+	fmt.Println("Closing channel: " + c.UUID().String())
+
 	c.shutdownIn <- true
+	<-c.inShutdown
+	c.shutdownOut <- true
+	<-c.outShutdown
+
 	c.running = false
+
+	c.OnClose(c)
+	c.connection.Close()
+	fmt.Println("Channel closed!")
+}
+
+func (c *SimpleChannel) SetCloseCallback(callback func(c Channel)) {
+	c.OnClose = callback
 }
 
 func (c *SimpleChannel) RegisterPacketListener(sample interface{}, listener Listener) {
@@ -77,7 +101,11 @@ func (c *SimpleChannel) RegisterPacketListener(sample interface{}, listener List
 }
 
 func (c *SimpleChannel) SendPacket(packet interface{}) error {
-	fmt.Println("Sending packet", packet)
+	if !c.running {
+		return ClosedChannel{}
+	}
+
+	fmt.Println("Sending packet", packet, "on", c.Uuid)
 
 	str, err := c.Encoder.EncodePacket(packet)
 
@@ -100,16 +128,21 @@ func (c SimpleChannel) UUID() uuid.UUID {
 	return c.Uuid
 }
 
+func (c SimpleChannel) Running() bool {
+	return c.running
+}
+
 func (c *SimpleChannel) outboundFunc() {
 	for {
 		select {
 		case <-c.shutdownOut:
-			fmt.Println("Channel: " + c.UUID().String() + " received shutdown, dumping message queue...")
+			fmt.Println("Shutting down outbound for: " + c.UUID().String())
 			for len(c.outbound) > 0 {
 				c.handleOut()
 			}
-			fmt.Println("Channel: " + c.UUID().String() + " shutdown")
+			fmt.Println("Outbound shutdown.")
 
+			c.outShutdown <- true
 			return
 		default:
 		}
@@ -119,40 +152,65 @@ func (c *SimpleChannel) outboundFunc() {
 }
 
 func (c *SimpleChannel) handleOut() {
-	message := <-c.outbound
-
-	fmt.Fprintln(c.connection, message)
+	select {
+	case message := <-c.outbound:
+		fmt.Fprintln(c.connection, message)
+	default:
+	}
 }
 
-func (c *SimpleChannel) inboundFunc() {
+func (c *SimpleChannel) readerFunc() {
 	reader := bufio.NewReader(c.connection)
 
 	for {
-		select {
-		case <-c.shutdownIn:
-			return
-		default:
-		}
-
 		var message string
 		var err error
 
 		if message, err = reader.ReadString('\n'); err != nil {
 			fmt.Println("[error]: failed to read channel: " + c.UUID().String())
+			fmt.Println(err)
 
 			if err == io.EOF {
 				c.Close()
+				return
 			}
 
 			continue
 		}
 
+		c.inbound <- message
+	}
+}
+
+func (c *SimpleChannel) inboundFunc() {
+	for {
+		select {
+		case <-c.shutdownIn:
+			fmt.Println("Shutting down inbound for: " + c.UUID().String())
+			for len(c.inbound) > 0 {
+				c.handleIn()
+			}
+			fmt.Println("Inbound shutdown.")
+
+			c.inShutdown <- true
+			return
+		default:
+		}
+
+		c.handleIn()
+	}
+}
+
+func (c *SimpleChannel) handleIn() {
+	select {
+	case message := <-c.inbound:
+		var err error
 		var decoded *DecodedPacket
 
 		if decoded, err = c.Encoder.DecodePacket(message); err != nil {
 			fmt.Println("[error]: failed to decode packet on channel: " + c.UUID().String())
 			fmt.Println(err)
-			continue
+			return
 		}
 
 		fmt.Println("Received packet:", decoded)
@@ -166,6 +224,7 @@ func (c *SimpleChannel) inboundFunc() {
 		}
 
 		fmt.Println("Finished processing packet.")
+	default:
 	}
 }
 

@@ -73,7 +73,14 @@ func (l *Listener) Start() {
 			fmt.Println("Starting channel...")
 			channel.Start()
 
-			l.connections.PushBack(channel)
+			elem := l.connections.PushBack(channel)
+
+			fmt.Println("Registering close callback")
+			channel.SetCloseCallback(func(c packet.Channel) {
+				fmt.Println("Removing", elem)
+				l.connections.Remove(elem)
+			})
+
 			fmt.Println("Channel initialized!")
 		}
 	}()
@@ -84,6 +91,8 @@ func (l *Listener) OnAllConnections(f func(channel packet.Channel)) {
 
 	for e := connections.Front(); e != nil; e = e.Next() {
 		channel := e.Value.(packet.Channel)
+
+		fmt.Println("Iterating on", channel.UUID())
 
 		f(channel)
 	}

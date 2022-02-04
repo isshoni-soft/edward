@@ -69,7 +69,7 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	var decodedStr string
 	var raw []byte
 
-	fmt.Println("Decoding packet: " + str)
+	fmt.Print("Decoding packet: " + str)
 
 	if d, err := base64.StdEncoding.DecodeString(str); err == nil {
 		decodedStr = string(d)
@@ -120,24 +120,6 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	}
 
 	return result, nil
-
-	// fmt.Println("Packet Data:", packet.Data)
-	//
-	// if packet.Data == nil {
-	// 	return result, nil
-	// }
-	//
-	// remarshaled, err := json.Marshal(packet.Data)
-	//
-	// if err != nil {
-	// 	fmt.Println("json encounterd error", err)
-	// }
-	//
-	// if err := json.Unmarshal(remarshaled, &packetValue); err != nil {
-	// 	return nil, err
-	// }
-	//
-	// return result, nil
 }
 
 func (s *SimpleEncoder) PacketRegistry() Registry {
