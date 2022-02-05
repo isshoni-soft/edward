@@ -35,54 +35,60 @@ type SimpleChannel struct {
 	Uuid    uuid.UUID
 	OnClose func(c Channel)
 
-	connection  net.Conn
-	running     bool
-	shutdownOut chan bool
-	outShutdown chan bool
-	shutdownIn  chan bool
-	inShutdown  chan bool
-	outbound    chan string
-	inbound     chan string
-	listeners   map[reflect.Type][]Listener
+	connection     net.Conn
+	running        bool
+	outShutdown    chan bool
+	inShutdown     chan bool
+	readerShutdown chan bool
+	outbound       chan string
+	inbound        chan string
+	listeners      map[reflect.Type][]Listener
 }
 
 func NewChannel(connection net.Conn, encoder Encoder) Channel {
 	return &SimpleChannel{
-		Encoder:     encoder,
-		Uuid:        uuid.New(),
-		OnClose:     func(c Channel) {},
-		connection:  connection,
-		running:     false,
-		shutdownOut: make(chan bool),
-		outShutdown: make(chan bool),
-		shutdownIn:  make(chan bool),
-		inShutdown:  make(chan bool),
-		outbound:    make(chan string, 10),
-		inbound:     make(chan string, 10),
-		listeners:   make(map[reflect.Type][]Listener),
+		Encoder:        encoder,
+		Uuid:           uuid.New(),
+		OnClose:        func(c Channel) {},
+		connection:     connection,
+		running:        false,
+		outShutdown:    make(chan bool),
+		inShutdown:     make(chan bool),
+		readerShutdown: make(chan bool, 2), // buffer this so reader doesn't block when submitting close on error
+		outbound:       make(chan string, 10),
+		inbound:        make(chan string, 10),
+		listeners:      make(map[reflect.Type][]Listener),
 	}
 }
 
 func (c *SimpleChannel) Start() {
+	c.running = true
+
 	c.run(c.readerFunc)
 	c.run(c.inboundFunc)
 	c.run(c.outboundFunc)
-
-	c.running = true
 }
 
 func (c *SimpleChannel) Close() {
 	fmt.Println("Closing channel: " + c.UUID().String())
 
-	c.shutdownIn <- true
+	fmt.Println("Closing connection...")
+	c.connection.Close()
+
+	fmt.Println("Waiting for reader thread to shutdown")
+	<-c.readerShutdown
+
+	close(c.inbound)
+	fmt.Println("Waiting for inbound thread to shutdown")
 	<-c.inShutdown
-	c.shutdownOut <- true
+
+	close(c.outbound)
+	fmt.Println("Waiting for outbound thread to shutdown")
 	<-c.outShutdown
 
 	c.running = false
 
 	c.OnClose(c)
-	c.connection.Close()
 	fmt.Println("Channel closed!")
 }
 
@@ -133,30 +139,11 @@ func (c SimpleChannel) Running() bool {
 }
 
 func (c *SimpleChannel) outboundFunc() {
-	for {
-		select {
-		case <-c.shutdownOut:
-			fmt.Println("Shutting down outbound for: " + c.UUID().String())
-			for len(c.outbound) > 0 {
-				c.handleOut()
-			}
-			fmt.Println("Outbound shutdown.")
-
-			c.outShutdown <- true
-			return
-		default:
-		}
-
-		c.handleOut()
-	}
-}
-
-func (c *SimpleChannel) handleOut() {
-	select {
-	case message := <-c.outbound:
+	for message := range c.outbound {
 		fmt.Fprintln(c.connection, message)
-	default:
 	}
+
+	c.outShutdown <- true
 }
 
 func (c *SimpleChannel) readerFunc() {
@@ -171,6 +158,7 @@ func (c *SimpleChannel) readerFunc() {
 			fmt.Println(err)
 
 			if err == io.EOF {
+				c.readerShutdown <- true
 				c.Close()
 				return
 			}
@@ -183,27 +171,7 @@ func (c *SimpleChannel) readerFunc() {
 }
 
 func (c *SimpleChannel) inboundFunc() {
-	for {
-		select {
-		case <-c.shutdownIn:
-			fmt.Println("Shutting down inbound for: " + c.UUID().String())
-			for len(c.inbound) > 0 {
-				c.handleIn()
-			}
-			fmt.Println("Inbound shutdown.")
-
-			c.inShutdown <- true
-			return
-		default:
-		}
-
-		c.handleIn()
-	}
-}
-
-func (c *SimpleChannel) handleIn() {
-	select {
-	case message := <-c.inbound:
+	for message := range c.inbound {
 		var err error
 		var decoded *DecodedPacket
 
@@ -224,8 +192,9 @@ func (c *SimpleChannel) handleIn() {
 		}
 
 		fmt.Println("Finished processing packet.")
-	default:
 	}
+
+	c.inShutdown <- true
 }
 
 func (c SimpleChannel) run(f func()) {
