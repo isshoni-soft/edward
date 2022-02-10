@@ -5,6 +5,7 @@ import (
 	"fmt"
 	errors "github.com/isshoni-soft/edward/error"
 	"github.com/isshoni-soft/edward/packet"
+	"github.com/isshoni-soft/edward/packet/protocol"
 	"net"
 )
 
@@ -12,8 +13,8 @@ type Listener struct {
 	Address        string
 	Port           string
 	Encoder        packet.Encoder
-	Protocol       Manager
-	ChannelPreInit func(channel packet.Channel, protocol Manager)
+	Protocol       protocol.Manager
+	ChannelPreInit func(channel packet.Channel, protocol protocol.Manager)
 
 	running     bool
 	connections *list.List

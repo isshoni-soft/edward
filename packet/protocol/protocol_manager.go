@@ -1,4 +1,4 @@
-package network
+package protocol
 
 import "github.com/isshoni-soft/edward/packet"
 
