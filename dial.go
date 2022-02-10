@@ -3,7 +3,7 @@ package network
 import (
 	"fmt"
 	"github.com/isshoni-soft/edward/packet"
-	"github.com/isshoni-soft/edward/packet/protocol"
+	"github.com/isshoni-soft/edward/protocol"
 	"net"
 )
 

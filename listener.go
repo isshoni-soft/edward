@@ -5,7 +5,7 @@ import (
 	"fmt"
 	errors "github.com/isshoni-soft/edward/error"
 	"github.com/isshoni-soft/edward/packet"
-	"github.com/isshoni-soft/edward/packet/protocol"
+	"github.com/isshoni-soft/edward/protocol"
 	"net"
 )
 
