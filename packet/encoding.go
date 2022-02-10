@@ -120,6 +120,12 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 		Data: packetValue,
 	}
 
+	if strict, ok := packetValue.(StrictPacket); ok && !strict.Valid() {
+		return nil, errors.InvalidStrictPacket{
+			Data: packetValue,
+		}
+	}
+
 	return result, nil
 }
 

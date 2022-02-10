@@ -2,6 +2,10 @@ package packet
 
 import "reflect"
 
+type StrictPacket interface {
+	Valid() bool
+}
+
 type Registry interface {
 	RegisterPacket(name string, sample interface{})
 	GetPacketTypeByName(name string) reflect.Type

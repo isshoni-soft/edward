@@ -13,3 +13,11 @@ type ClosedChannel struct{}
 func (c ClosedChannel) Error() string {
 	return "this channel is not running"
 }
+
+type InvalidStrictPacket struct {
+	Data interface{}
+}
+
+func (i InvalidStrictPacket) Error() string {
+	return "strict packet failed validation"
+}
