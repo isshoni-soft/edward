@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/google/uuid"
-	network "github.com/isshoni-soft/edward/error"
+	errors "github.com/isshoni-soft/edward/error"
 	"io"
 	"net"
 	"reflect"
@@ -104,7 +104,7 @@ func (c *SimpleChannel) RegisterPacketListener(sample interface{}, listener List
 
 func (c *SimpleChannel) SendPacket(packet interface{}) error {
 	if !c.running {
-		return network.ClosedChannel{}
+		return errors.ClosedChannel{}
 	}
 
 	fmt.Println("Sending packet", packet, "on", c.Uuid)

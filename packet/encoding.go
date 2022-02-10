@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	error2 "github.com/isshoni-soft/edward/error"
+	errors "github.com/isshoni-soft/edward/error"
 	"reflect"
 )
 
@@ -45,7 +45,7 @@ func NewSimpleEncoderWithRegistry(registry Registry) *SimpleEncoder {
 
 func (s *SimpleEncoder) EncodePacket(data interface{}) (string, error) {
 	if !s.registry.IsPacket(data) {
-		return "", error2.UnrecognizedPacket{
+		return "", errors.UnrecognizedPacket{
 			Type: reflect.TypeOf(data).String(),
 		}
 	}
@@ -76,7 +76,7 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 		decodedStr = string(d)
 		raw = d
 	} else {
-		return nil, error2.ProtocolError{
+		return nil, errors.ProtocolError{
 			Reason: "failed to decode base64",
 		}
 	}
@@ -95,7 +95,7 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	var packetType reflect.Type
 
 	if !s.registry.IsPacketName(packet.Name) {
-		return nil, error2.UnrecognizedPacket{
+		return nil, errors.UnrecognizedPacket{
 			Type: packet.Name,
 		}
 	} else {
