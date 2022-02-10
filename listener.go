@@ -3,6 +3,7 @@ package network
 import (
 	"container/list"
 	"fmt"
+	error2 "github.com/isshoni-soft/edward/error"
 	"github.com/isshoni-soft/edward/packet"
 	"net"
 )
@@ -22,11 +23,11 @@ type Listener struct {
 
 func (l *Listener) Start() error {
 	if l.running {
-		return ListenerRunning{}
+		return error2.ListenerRunning{}
 	}
 
 	if l.Protocol == nil {
-		return NoProtocol{}
+		return error2.NoProtocol{}
 	}
 
 	if l.connections == nil {

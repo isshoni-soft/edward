@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/isshoni-soft/edward"
+	network "github.com/isshoni-soft/edward/error"
 	"io"
 	"net"
 	"reflect"
