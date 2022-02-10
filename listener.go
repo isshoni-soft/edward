@@ -11,8 +11,8 @@ type Listener struct {
 	Address        string
 	Port           string
 	Encoder        packet.Encoder
-	Protocol       packet.Manager
-	ChannelPreInit func(channel packet.Channel, protocol packet.Manager)
+	Protocol       Manager
+	ChannelPreInit func(channel packet.Channel, protocol Manager)
 
 	running     bool
 	connections *list.List

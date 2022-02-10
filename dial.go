@@ -10,7 +10,7 @@ type Dialer struct {
 	Address  string
 	Port     string
 	Encoder  packet.Encoder
-	Protocol packet.Manager
+	Protocol Manager
 	PreInit  func(c packet.Channel)
 }
 
@@ -34,7 +34,7 @@ func Dial(dialer Dialer) packet.Channel {
 	fmt.Println("Initializing channel...")
 	result.Start()
 	fmt.Println("Protocol post connect.")
-	dialer.Protocol.ClientPostStart(result)
+	dialer.Protocol.PostClientStart(result)
 
 	fmt.Println("Channel initialized!")
 
