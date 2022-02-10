@@ -8,12 +8,6 @@ import (
 	"net"
 )
 
-// Network Listener
-// TODO: allow this to listen on an ip address and port #
-// TODO: open a new connection listener thread on ip addr & port
-// TODO: on new connection open a new packet channel
-// TODO: keep a reference to that packet channel for communication
-
 type Listener struct {
 	Address        string
 	Port           string
@@ -27,13 +21,13 @@ type Listener struct {
 	shutdown    chan bool
 }
 
-func (l *Listener) Start() {
+func (l *Listener) Start() error {
 	if l.running {
-		return
+		return ListenerRunning{}
 	}
 
 	if l.Protocol == nil {
-		panic(fmt.Errorf("network listener requires a protocol"))
+		return NoProtocol{}
 	}
 
 	if l.connections == nil {
@@ -49,7 +43,7 @@ func (l *Listener) Start() {
 	if li, err := net.Listen("tcp", l.Address+":"+l.Port); err == nil {
 		l.listener = li
 	} else {
-		panic(err)
+		return err
 	}
 
 	l.shutdown = make(chan bool, 1)
@@ -62,9 +56,14 @@ func (l *Listener) Start() {
 			default:
 			}
 
-			conn, _ := l.listener.Accept()
-			fmt.Println("Accepted new connection")
+			conn, e := l.listener.Accept()
 
+			if e != nil {
+				fmt.Println("Incoming connection errored:", e)
+				continue
+			}
+
+			fmt.Println("Accepted new connection")
 			fmt.Println("Creating channel...")
 			channel := packet.NewChannel(conn, l.Encoder)
 			fmt.Println("Applying protocol...")
@@ -84,6 +83,12 @@ func (l *Listener) Start() {
 			fmt.Println("Channel initialized!")
 		}
 	}()
+
+	return nil
+}
+
+func (l *Listener) Close() {
+	l.shutdown <- true
 }
 
 func (l *Listener) OnAllConnections(f func(channel packet.Channel)) {

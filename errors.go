@@ -1,4 +1,4 @@
-package packet
+package network
 
 type UnrecognizedPacket struct {
 	Type string
@@ -20,4 +20,16 @@ type ClosedChannel struct{}
 
 func (c ClosedChannel) Error() string {
 	return "this channel is not running"
+}
+
+type ListenerRunning struct{}
+
+func (l ListenerRunning) Error() string {
+	return "this listener is already started"
+}
+
+type NoProtocol struct{}
+
+func (n NoProtocol) Error() string {
+	return "network listener requires a protocol"
 }

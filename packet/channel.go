@@ -4,18 +4,14 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/isshoni-soft/edward"
 	"io"
 	"net"
 	"reflect"
 )
 
 // Packet System
-// TODO: channel is main object for interacting with a connected client
-// TODO: channel enqueues inbound/outbound messages
-// TODO: handles encryption and key propagation
-// TODO: allow packet type registration along with listeners -- make better when go 1.18 arrives
-// TODO: handles de/serialization into registered packet types
-// TODO: simple packets can be automatically serialized, similar to json library serialization
+// TODO: handles encryption
 
 type Listener func(channel Channel, packet interface{})
 
@@ -55,8 +51,8 @@ func NewChannel(connection net.Conn, encoder Encoder) Channel {
 		outShutdown:    make(chan bool),
 		inShutdown:     make(chan bool),
 		readerShutdown: make(chan bool, 2), // buffer this so reader doesn't block when submitting close on error
-		outbound:       make(chan string, 10),
-		inbound:        make(chan string, 10),
+		outbound:       make(chan string, 20),
+		inbound:        make(chan string, 20),
 		listeners:      make(map[reflect.Type][]Listener),
 	}
 }
@@ -108,7 +104,7 @@ func (c *SimpleChannel) RegisterPacketListener(sample interface{}, listener List
 
 func (c *SimpleChannel) SendPacket(packet interface{}) error {
 	if !c.running {
-		return ClosedChannel{}
+		return network.ClosedChannel{}
 	}
 
 	fmt.Println("Sending packet", packet, "on", c.Uuid)
