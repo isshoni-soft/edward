@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/isshoni-soft/edward/packet"
-	"github.com/isshoni-soft/edward/protocol"
 	"net"
 )
 
@@ -12,8 +11,8 @@ type Listener struct {
 	Address        string
 	Port           string
 	Encoder        packet.Encoder
-	Protocol       protocol.Manager
-	ChannelPreInit func(channel packet.Channel, protocol protocol.Manager)
+	Protocol       packet.Manager
+	ChannelPreInit func(channel packet.Channel, protocol packet.Manager)
 
 	running     bool
 	connections *list.List

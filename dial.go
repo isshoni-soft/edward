@@ -3,7 +3,6 @@ package network
 import (
 	"fmt"
 	"github.com/isshoni-soft/edward/packet"
-	"github.com/isshoni-soft/edward/protocol"
 	"net"
 )
 
@@ -11,7 +10,7 @@ type Dialer struct {
 	Address  string
 	Port     string
 	Encoder  packet.Encoder
-	Protocol protocol.Manager
+	Protocol packet.Manager
 	PreInit  func(c packet.Channel)
 }
 
