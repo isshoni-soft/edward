@@ -20,7 +20,7 @@ type Channel interface {
 	Close()
 	SetCloseCallback(callback func(c Channel))
 	RegisterPacketListener(sample interface{}, listener Listener)
-	SendPacket(packet interface{}) error
+	SendPacket(packet interface{}) error // TODO: Make this return a channel on success so the client can block for packet sending
 	SendRawMessage(str string)
 	UUID() uuid.UUID
 	Running() bool
@@ -66,7 +66,13 @@ func (c *SimpleChannel) Start() {
 }
 
 func (c *SimpleChannel) Close() {
+	if !c.running {
+		return
+	}
+
 	fmt.Println("Closing channel: " + c.UUID().String())
+
+	c.running = false
 
 	fmt.Println("Closing connection...")
 	c.connection.Close()
@@ -81,8 +87,6 @@ func (c *SimpleChannel) Close() {
 	close(c.outbound)
 	fmt.Println("Waiting for outbound thread to shutdown")
 	<-c.outShutdown
-
-	c.running = false
 
 	c.OnClose(c)
 	fmt.Println("Channel closed!")
@@ -150,14 +154,18 @@ func (c *SimpleChannel) readerFunc() {
 		var err error
 
 		if message, err = reader.ReadString('\n'); err != nil {
-			fmt.Println("[error]: failed to read channel: " + c.UUID().String())
-			fmt.Println(err)
-
-			if err == io.EOF {
+			if err == io.EOF || !c.running {
 				c.readerShutdown <- true
-				c.Close()
+
+				if c.running {
+					c.Close()
+				}
+
 				return
 			}
+
+			fmt.Println("[error]: failed to read channel: " + c.UUID().String())
+			fmt.Println(err)
 
 			continue
 		}
@@ -168,6 +176,8 @@ func (c *SimpleChannel) readerFunc() {
 
 func (c *SimpleChannel) inboundFunc() {
 	for message := range c.inbound {
+		fmt.Println("Processing inbound: " + message)
+
 		var err error
 		var decoded *DecodedPacket
 
@@ -183,13 +193,14 @@ func (c *SimpleChannel) inboundFunc() {
 			fmt.Println("Sending packet to listeners.")
 
 			for _, listener := range listeners {
-				listener(c, decoded.Data)
+				go listener(c, decoded.Data)
 			}
 		}
 
 		fmt.Println("Finished processing packet.")
 	}
 
+	fmt.Println("Submitting shutdown...")
 	c.inShutdown <- true
 }
 
