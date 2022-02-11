@@ -20,10 +20,15 @@ type Channel interface {
 	Close()
 	SetCloseCallback(callback func(c Channel))
 	RegisterPacketListener(sample interface{}, listener Listener)
-	SendPacket(packet interface{}) error // TODO: Make this return a channel on success so the client can block for packet sending
-	SendRawMessage(str string)
+	SendPacket(packet interface{}) (chan bool, error) // TODO: Make this return a channel on success so the client can block for packet sending
+	SendRawMessage(str string) chan bool
 	UUID() uuid.UUID
 	Running() bool
+}
+
+type outboundPacket struct {
+	Sent    chan bool
+	Message string
 }
 
 type SimpleChannel struct {
@@ -36,7 +41,7 @@ type SimpleChannel struct {
 	outShutdown    chan bool
 	inShutdown     chan bool
 	readerShutdown chan bool
-	outbound       chan string
+	outbound       chan outboundPacket
 	inbound        chan string
 	listeners      map[reflect.Type][]Listener
 }
@@ -51,7 +56,7 @@ func NewChannel(connection net.Conn, encoder Encoder) Channel {
 		outShutdown:    make(chan bool),
 		inShutdown:     make(chan bool),
 		readerShutdown: make(chan bool, 2), // buffer this so reader doesn't block when submitting close on error
-		outbound:       make(chan string, 20),
+		outbound:       make(chan outboundPacket, 20),
 		inbound:        make(chan string, 20),
 		listeners:      make(map[reflect.Type][]Listener),
 	}
@@ -106,9 +111,9 @@ func (c *SimpleChannel) RegisterPacketListener(sample interface{}, listener List
 	}
 }
 
-func (c *SimpleChannel) SendPacket(packet interface{}) error {
+func (c *SimpleChannel) SendPacket(packet interface{}) (chan bool, error) {
 	if !c.running {
-		return errors.ClosedChannel{}
+		return nil, errors.ClosedChannel{}
 	}
 
 	fmt.Println("Sending packet", packet, "on", c.Uuid)
@@ -118,16 +123,21 @@ func (c *SimpleChannel) SendPacket(packet interface{}) error {
 	fmt.Println("Encoded packet: " + str)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	c.SendRawMessage(str)
-
-	return nil
+	return c.SendRawMessage(str), nil
 }
 
-func (c *SimpleChannel) SendRawMessage(str string) {
-	c.outbound <- str
+func (c *SimpleChannel) SendRawMessage(str string) chan bool {
+	p := outboundPacket{
+		Sent:    make(chan bool, 2),
+		Message: str,
+	}
+
+	c.outbound <- p
+
+	return p.Sent
 }
 
 func (c SimpleChannel) UUID() uuid.UUID {
@@ -139,8 +149,9 @@ func (c SimpleChannel) Running() bool {
 }
 
 func (c *SimpleChannel) outboundFunc() {
-	for message := range c.outbound {
-		fmt.Fprintln(c.connection, message)
+	for p := range c.outbound {
+		fmt.Fprintln(c.connection, p.Message)
+		p.Sent <- true
 	}
 
 	c.outShutdown <- true
