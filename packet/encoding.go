@@ -14,7 +14,7 @@ type Encoder interface {
 	PacketRegistry() Registry
 }
 
-type packet struct {
+type networkPacket struct {
 	Name string      `json:"name"`
 	Data interface{} `json:"data,omitempty"`
 }
@@ -50,7 +50,7 @@ func (s *SimpleEncoder) EncodePacket(data interface{}) (string, error) {
 		}
 	}
 
-	packet := packet{
+	packet := networkPacket{
 		Name: s.registry.GetPacketNameByType(reflect.TypeOf(data)),
 		Data: data,
 	}
@@ -85,7 +85,7 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 
 	// TODO: Decrypt here
 
-	var packet *packet
+	var packet *networkPacket
 
 	fmt.Println("Unmarshalling packet...")
 	if err := json.Unmarshal(raw, &packet); err != nil {
@@ -101,17 +101,19 @@ func (s *SimpleEncoder) DecodePacket(str string) (*DecodedPacket, error) {
 	} else {
 		packetType = s.registry.GetPacketTypeByName(packet.Name)
 	}
-
-	// this might be overkill, but I don't trust the json library
-	// want to make sure we can safely cast the received interface to the packet's type
+	
 	packetValue := reflect.New(packetType).Interface()
 
+	// we have to actually do this because of the way this data is currently stored in memory
+	// rather than manually mapping this different format I opt to remarshal just packet data
+	// then unmarshal it into an empty value of the desired type. All of this just so that
+	// we can cast the packet data interface.
 	remarshaled, _ := json.Marshal(packet.Data)
 
-	fmt.Println("RE: " + string(remarshaled))
-
 	if err := json.Unmarshal(remarshaled, &packetValue); err != nil {
-		fmt.Println("ERROR: ", err)
+		return nil, errors.MalformedPacket{
+			Data: packet.Data,
+		}
 	}
 
 	result := &DecodedPacket{

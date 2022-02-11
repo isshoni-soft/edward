@@ -21,3 +21,11 @@ type InvalidStrictPacket struct {
 func (i InvalidStrictPacket) Error() string {
 	return "strict packet failed validation"
 }
+
+type MalformedPacket struct {
+	Data interface{}
+}
+
+func (m MalformedPacket) Error() string {
+	return "packet data could not be unmarshaled into packet struct"
+}
