@@ -20,7 +20,7 @@ type Channel interface {
 	Close()
 	SetCloseCallback(callback func(c Channel))
 	RegisterPacketListener(sample interface{}, listener Listener)
-	SendPacket(packet interface{}) (chan bool, error) // TODO: Make this return a channel on success so the client can block for packet sending
+	SendPacket(packet interface{}) (chan bool, error)
 	SendRawMessage(str string) chan bool
 	UUID() uuid.UUID
 	Running() bool
